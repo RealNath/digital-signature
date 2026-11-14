@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 
 __version__ = "v0.0.1"
