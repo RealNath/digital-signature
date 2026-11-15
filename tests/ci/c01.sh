@@ -4,7 +4,7 @@
 # Jangan memasang program dari kode sumber.
 
 set -euo pipefail
-SCENARIO=c01-happy-path
+SCENARIO=c01
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 clean_output

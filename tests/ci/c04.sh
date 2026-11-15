@@ -2,7 +2,7 @@
 # C04: Jalankan verifikasi dengan path artefak yang berkasnya tidak tersedia. 
 
 set -euo pipefail
-SCENARIO=c04-missing-artifact
+SCENARIO=c04
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 clean_output

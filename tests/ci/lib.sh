@@ -15,7 +15,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
-DIST_DIR=${DIST_DIR:-$ROOT_DIR/dist}
+DIST_DIR=${DIST_DIR:-$ROOT_DIR/dist/$SCENARIO}
 OUT_DIR=${OUT_DIR:-$ROOT_DIR/out/$SCENARIO}
 TRUST_STORE=${TRUST_STORE:-$ROOT_DIR/ci/trust.json}
 
@@ -24,7 +24,7 @@ docker_cmd() {
 }
 
 clean_output() {
-  rm -rf "$OUT_DIR"
+  rm -rf "$OUT_DIR" "$DIST_DIR"
   mkdir -p "$OUT_DIR"
 }
 

@@ -3,7 +3,7 @@
 # Pertahankan ukuran dan nama berkas, lalu ulangi alur verifikasi.
 
 set -euo pipefail
-SCENARIO=c02-tampered-artifact
+SCENARIO=c02
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 clean_output

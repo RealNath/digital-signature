@@ -2,7 +2,7 @@
 # C03: Verifikasi artefak menggunakan trust store kosong atau kunci yang tidak diizinkan untuk paket tersebut.
 
 set -euo pipefail
-SCENARIO=c03-untrusted-key
+SCENARIO=c03
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 clean_output
