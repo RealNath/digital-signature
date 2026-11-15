@@ -16,8 +16,6 @@ env:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      KEY_FILE: ${{ runner.temp }}/signing.key.pem
     steps:
       - uses: actions/checkout@v4
 
@@ -29,8 +27,10 @@ jobs:
             echo "SIGNING_KEY_PEM secret is not set" >&2
             exit 1
           fi
+          KEY_FILE="$RUNNER_TEMP/signing.key.pem"
           install -m 600 /dev/null "$KEY_FILE"
           printf '%s\n' "$SIGNING_KEY_PEM" > "$KEY_FILE"
+          echo "KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
 
       - name: C01 Ambil image rilis dari registry, lalu jalankan sign dan verify terhadap artefak sah
         run: bash tests/ci/c01.sh
