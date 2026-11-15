@@ -7,7 +7,7 @@ SCENARIO=c05
 
 clean_output
 
-docker_cmd "$IMAGE" --version </dev/null
+version=$(docker_cmd "$IMAGE" --version </dev/null)
 docker_cmd "$IMAGE" --help </dev/null >/dev/null
 
 keyid=$(docker_cmd -v "$OUT_DIR:/output" "$IMAGE" keygen \
@@ -18,5 +18,14 @@ test -s "$OUT_DIR/c05-key.pub.pem"
 test "$(stat -c %u "$OUT_DIR/c05-key.pub.pem")" = "$(id -u)"
 rm -f "$OUT_DIR/c05-key.key.pem" "$OUT_DIR/c05-key.pub.pem"
 
-echo "keygen fingerprint: $keyid"
-echo "ran with uid $(id -u), no TTY, no network"
+cat >"$OUT_DIR/evidence.txt" <<EOF
+stdin=closed, tty=none, network=none
+image=$IMAGE
+cli_version=$version
+runner_uid=$(id -u)
+runner_gid=$(id -g)
+keygen_fingerprint=$keyid
+note=keypair yang di-generate dihapus (private key tidak disimpan)
+EOF
+
+cat "$OUT_DIR/evidence.txt"
