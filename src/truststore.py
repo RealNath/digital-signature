@@ -18,10 +18,8 @@ except ImportError:
 SCHEMA = "minisign-trust/v1"
 MAX_TRUST_STORE_BYTES = 1024 * 1024
 
-
 def empty_store() -> dict[str, Any]:
     return {"schema": SCHEMA, "keys": []}
-
 
 def validate_store(value: Any) -> dict[str, Any]:
     store = require_exact_fields(value, ("schema", "keys"), "trust store")
@@ -47,8 +45,6 @@ def validate_store(value: Any) -> dict[str, Any]:
             public_key = keys.load_public_key(pem.encode("ascii"))
             actual_algorithm = keys.get_algorithm(public_key)
             actual_keyid = keys.fingerprint(public_key)
-        except keys.CryptoNotReadyError:
-            raise
         except Exception as exc:
             raise FormatError(f"{label}.public_key_pem is invalid") from exc
         if actual_algorithm != algorithm:
@@ -66,16 +62,13 @@ def validate_store(value: Any) -> dict[str, Any]:
             package_names.add(package_name)
     return store
 
-
 def load_store(path: str | os.PathLike[str]) -> dict[str, Any]:
     data = Path(path).read_bytes()
     return parse_store(data)
 
-
 def parse_store(data: bytes) -> dict[str, Any]:
     value = strict_json_loads(data, max_bytes=MAX_TRUST_STORE_BYTES, label="trust store")
     return validate_store(value)
-
 
 def save_store_atomic(path: str | os.PathLike[str], store: dict[str, Any]) -> None:
     validated = validate_store(store)
@@ -105,15 +98,12 @@ def save_store_atomic(path: str | os.PathLike[str], store: dict[str, Any]) -> No
             except FileNotFoundError:
                 pass
 
-
 def add_key(path: str | os.PathLike[str], public_pem: bytes, package: str) -> dict[str, Any]:
     require_string(package, "package", PACKAGE_RE)
     try:
         public_key = keys.load_public_key(public_pem)
         algorithm = keys.get_algorithm(public_key)
         keyid = keys.fingerprint(public_key)
-    except keys.CryptoNotReadyError:
-        raise
     except Exception as exc:
         raise FormatError("public key is invalid") from exc
     if algorithm not in ALGORITHMS or type(keyid) is not str or len(keyid) != 64:
@@ -139,7 +129,6 @@ def add_key(path: str | os.PathLike[str], public_pem: bytes, package: str) -> di
             entry["packages"].append(package)
     save_store_atomic(target, store)
     return {"keyid": keyid, "algorithm": algorithm, "package": package}
-
 
 def remove_key(path: str | os.PathLike[str], keyid: str) -> None:
     require_string(keyid, "keyid", HEX256_RE)

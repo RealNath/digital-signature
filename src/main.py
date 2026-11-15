@@ -29,7 +29,6 @@ EXIT_OK = 0
 EXIT_REJECTED = 1
 EXIT_ERROR = 2
 
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="minisign", description="Sign and verify software releases.")
     parser.add_argument("--version", action="version", version=__version__)
@@ -76,13 +75,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(handler=cmd_trust_remove)
     return parser
 
-
 def _validate_release_inputs(package: str, version: str) -> None:
     if not isinstance(package, str) or re.fullmatch(PACKAGE_RE, package) is None:
         raise ValueError("package name has an invalid format")
     if not isinstance(version, str) or re.fullmatch(VERSION_RE, version) is None:
         raise ValueError("release version has an invalid format")
-
 
 def _atomic_exclusive_pair(key_path: Path, public_path: Path, key_pem: bytes, public_pem: bytes, force: bool) -> None:
     targets = (key_path, public_path)
@@ -110,7 +107,6 @@ def _atomic_exclusive_pair(key_path: Path, public_path: Path, key_pem: bytes, pu
             except FileNotFoundError:
                 pass
 
-
 def cmd_keygen(args: argparse.Namespace) -> int:
     try:
         key_pem, public_pem, keyid = keys.generate_keypair(args.algorithm)
@@ -124,13 +120,11 @@ def cmd_keygen(args: argparse.Namespace) -> int:
         print(f"minisign: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
-
 def _write_new(path: str, data: bytes) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     with open(target, "xb") as stream:
         stream.write(data)
-
 
 def cmd_sign(args: argparse.Namespace) -> int:
     try:
@@ -163,7 +157,6 @@ def cmd_sign(args: argparse.Namespace) -> int:
         print(f"minisign: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
-
 def cmd_verify(args: argparse.Namespace) -> int:
     result = None
     try:
@@ -172,12 +165,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
     except (OSError, ValueError, FormatError) as exc:
         result = VerifyResult(False, "INPUT_ERROR", str(exc))
     except Exception as exc:
-        # The crypto placeholder raises until work item 1 replaces it.
-        if isinstance(exc, getattr(keys, "CryptoNotReadyError", ())):
-            result = VerifyResult(False, "INPUT_ERROR", str(exc))
-        else:
-            print(f"minisign: {exc}", file=sys.stderr)
-            return EXIT_ERROR
+        print(f"minisign: {exc}", file=sys.stderr)
+        return EXIT_ERROR
     if args.as_json:
         print(json.dumps(result.as_dict(), separators=(",", ":"), ensure_ascii=True))
     elif result.valid:
@@ -185,7 +174,6 @@ def cmd_verify(args: argparse.Namespace) -> int:
     else:
         print(f"{result.status}: {result.message}", file=sys.stderr)
     return EXIT_OK if result.status == "OK" else EXIT_ERROR if result.status == "INPUT_ERROR" else EXIT_REJECTED
-
 
 def cmd_trust_add(args: argparse.Namespace) -> int:
     try:
@@ -195,7 +183,6 @@ def cmd_trust_add(args: argparse.Namespace) -> int:
     except Exception as exc:
         print(f"minisign: {exc}", file=sys.stderr)
         return EXIT_ERROR
-
 
 def cmd_trust_list(args: argparse.Namespace) -> int:
     try:
@@ -207,7 +194,6 @@ def cmd_trust_list(args: argparse.Namespace) -> int:
         print(f"minisign: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
-
 def cmd_trust_remove(args: argparse.Namespace) -> int:
     try:
         truststore.remove_key(args.store, args.keyid)
@@ -216,12 +202,10 @@ def cmd_trust_remove(args: argparse.Namespace) -> int:
         print(f"minisign: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
-
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     return args.handler(args)
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -11,7 +11,6 @@ except ImportError:
 MAX_BUNDLE_BYTES = 64 * 1024
 SCHEMA = "minisign-bundle/v1"
 
-
 def build_bundle(manifest_bytes: bytes, signature: bytes) -> bytes:
     if not isinstance(manifest_bytes, bytes) or not isinstance(signature, bytes):
         raise TypeError("manifest and signature must be bytes")
@@ -23,7 +22,6 @@ def build_bundle(manifest_bytes: bytes, signature: bytes) -> bytes:
     if len(result) > MAX_BUNDLE_BYTES:
         raise FormatError("bundle exceeds the 64 KiB limit")
     return result
-
 
 def parse_bundle(data: bytes) -> tuple[bytes, bytes]:
     value: Any = strict_json_loads(data, max_bytes=MAX_BUNDLE_BYTES, label="bundle")

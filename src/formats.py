@@ -4,10 +4,8 @@ import json
 import re
 from typing import Any
 
-
 class FormatError(ValueError):
     """Input bytes do not satisfy the on-disk format contract."""
-
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
@@ -16,7 +14,6 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             raise FormatError(f"duplicate JSON field: {key}")
         result[key] = value
     return result
-
 
 def strict_json_loads(data: bytes, *, max_bytes: int, label: str) -> Any:
     if not isinstance(data, bytes):
@@ -44,12 +41,10 @@ def strict_json_loads(data: bytes, *, max_bytes: int, label: str) -> Any:
     except (json.JSONDecodeError, RecursionError) as exc:
         raise FormatError(f"{label} is not valid JSON") from exc
 
-
 def require_exact_fields(value: Any, fields: tuple[str, ...], label: str) -> dict[str, Any]:
     if type(value) is not dict or set(value) != set(fields):
         raise FormatError(f"{label} must contain exactly: {', '.join(fields)}")
     return value
-
 
 def require_string(value: Any, label: str, pattern: str | None = None) -> str:
     if type(value) is not str:
@@ -62,10 +57,8 @@ def require_string(value: Any, label: str, pattern: str | None = None) -> str:
         raise FormatError(f"{label} has an invalid value")
     return value
 
-
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
-
 
 def strict_b64decode(value: Any, label: str) -> bytes:
     import base64

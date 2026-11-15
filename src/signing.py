@@ -2,64 +2,81 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.keys import get_algorithm
+try:
+    from .keys import ECDSA_P256, ED25519, RSA_PSS, get_algorithm
+except ImportError:
+    from keys import ECDSA_P256, ED25519, RSA_PSS, get_algorithm
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
-from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+from cryptography.hazmat.primitives.asymmetric import ec, padding
+from cryptography.hazmat.primitives.asymmetric.utils import (
+    decode_dss_signature,
+    encode_dss_signature,
+)
+
+RSA_SALT_LENGTH = 32
+ECDSA_SCALAR_BYTES = 32
+
+# Fixed signature sizes from Table 2.1.
+SIGNATURE_SIZES = {
+    RSA_PSS: 384,
+    ECDSA_P256: 64,
+    ED25519: 64,
+}
 
 def sign(private_key: Any, message: bytes) -> bytes:
     """Sign the exact message bytes; implementations must not pre-hash twice."""
 
     algorithm = get_algorithm(private_key)
 
-    if algorithm == "RSA-3072":
-        signature = private_key.sign(
+    if algorithm == RSA_PSS:
+        return private_key.sign(
             message,
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=32
+                salt_length=RSA_SALT_LENGTH,
             ),
-            hashes.SHA256()
-        )
-    elif algorithm == "P-256":
-        der_signature = private_key.sign(
-            message,
-            ec.ECDSA(hashes.SHA256())
+            hashes.SHA256(),
         )
 
+    if algorithm == ECDSA_P256:
+        der_signature = private_key.sign(message, ec.ECDSA(hashes.SHA256()))
         r, s = decode_dss_signature(der_signature)
+        return r.to_bytes(ECDSA_SCALAR_BYTES, "big") + s.to_bytes(ECDSA_SCALAR_BYTES, "big")
 
-        r_bytes = r.to_bytes(32, byteorder='big')
-        s_bytes = s.to_bytes(32, byteorder='big')
+    if algorithm == ED25519:
+        return private_key.sign(message)
 
-        signature = r_bytes + s_bytes
-    elif algorithm == "Ed25519":
-        signature = private_key.sign(message)
-    return signature
+    raise ValueError(f"unsupported algorithm: {algorithm}")
 
 def verify(public_key: Any, message: bytes, signature: bytes) -> bool:
     """Verify the exact message bytes and return False for an invalid signature."""
+
+    algorithm = get_algorithm(public_key)
+    if len(signature) != SIGNATURE_SIZES[algorithm]:
+        return False
+
     try:
-        if isinstance(public_key, ed25519.Ed25519PublicKey):
-            public_key.verify(signature, message)
-        elif isinstance(public_key, ec.EllipticCurvePublicKey):
-            public_key.verify(signature, message, ec.ECDSA(hashes.SHA256()))
-        elif isinstance(public_key, rsa.RSAPublicKey):
+        if algorithm == RSA_PSS:
             public_key.verify(
                 signature,
                 message,
                 padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.MAX_LENGTH,
+                    salt_length=RSA_SALT_LENGTH,
                 ),
                 hashes.SHA256(),
             )
+        elif algorithm == ECDSA_P256:
+            r = int.from_bytes(signature[:ECDSA_SCALAR_BYTES], "big")
+            s = int.from_bytes(signature[ECDSA_SCALAR_BYTES:], "big")
+            public_key.verify(
+                encode_dss_signature(r, s), message, ec.ECDSA(hashes.SHA256())
+            )
         else:
-            raise TypeError(f"Unsupported public key type: {type(public_key)}")
-
-        return True
-
-    except InvalidSignature:
+            public_key.verify(signature, message)
+    except (InvalidSignature, ValueError):
         return False
+
+    return True

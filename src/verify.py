@@ -19,7 +19,6 @@ except ImportError:
     from manifest import ALGORITHMS, parse_manifest
     from truststore import parse_store
 
-
 @dataclass(frozen=True)
 class VerifyResult:
     valid: bool
@@ -33,7 +32,6 @@ class VerifyResult:
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
-
 def _result(status: str, message: str, manifest: dict[str, Any] | None = None) -> VerifyResult:
     artifact = manifest or {}
     return VerifyResult(
@@ -45,7 +43,6 @@ def _result(status: str, message: str, manifest: dict[str, Any] | None = None) -
         package=artifact.get("package"),
         version=artifact.get("version"),
     )
-
 
 def verify_bytes(
     artifact_bytes: bytes,
@@ -77,8 +74,6 @@ def verify_bytes(
         if keys.get_algorithm(public_key) != algorithm or keys.fingerprint(public_key) != manifest["keyid"]:
             return _result("FORMAT_ERROR", "Trust-store key metadata does not match its public key.", manifest)
         signature_valid = signing.verify(public_key, manifest_bytes, signature)
-    except keys.CryptoNotReadyError:
-        raise
     except Exception:
         return _result("FORMAT_ERROR", "Trusted public key could not be loaded.", manifest)
     if not signature_valid:
@@ -96,7 +91,6 @@ def verify_bytes(
         return _result("ARTIFACT_MISMATCH", "Artifact size or SHA-256 does not match the manifest.", manifest)
 
     return _result("OK", "Signature and artifact are valid.", manifest)
-
 
 def read_verify_inputs(
     artifact_path: str | os.PathLike[str],

@@ -17,7 +17,6 @@ ARTIFACT_NAME_RE = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
 HEX256_RE = r"[0-9a-f]{64}"
 MAX_SAFE_INTEGER = 9007199254740991
 
-
 def validate_manifest(value: Any) -> dict[str, Any]:
     manifest = require_exact_fields(
         value, ("schema", "package", "version", "algorithm", "keyid", "artifact"), "manifest"
@@ -34,7 +33,6 @@ def validate_manifest(value: Any) -> dict[str, Any]:
         raise FormatError("manifest.artifact.size must be an integer in the permitted range")
     require_string(artifact["sha256"], "manifest.artifact.sha256", HEX256_RE)
     return manifest
-
 
 def serialize_manifest(value: Any) -> bytes:
     manifest = validate_manifest(value)
@@ -55,7 +53,6 @@ def serialize_manifest(value: Any) -> bytes:
         raise FormatError("manifest exceeds the 16 KiB limit")
     return data
 
-
 def parse_manifest(data: bytes) -> dict[str, Any]:
     value = strict_json_loads(data, max_bytes=MAX_MANIFEST_BYTES, label="manifest")
     manifest = validate_manifest(value)
@@ -64,7 +61,6 @@ def parse_manifest(data: bytes) -> dict[str, Any]:
     if re.search(rb"\\u[0-9a-fA-F]{4}", data):
         raise FormatError("manifest must not use \\uXXXX escapes")
     return manifest
-
 
 def build_manifest(
     package: str,
