@@ -17,7 +17,7 @@ minisign trust remove --keyid <fingerprint> --store <trust.json>
 
 The three profile names are `rsa-pss-sha256`, `ecdsa-p256-sha256`, and `ed25519`. Key generation writes `<prefix>.key.pem` (PKCS8) and `<prefix>.pub.pem` (SPKI). Existing key files require the explicit `--force` option. Bundle output is created exclusively and is never silently overwritten.
 
-## Crypto core integration (work item 1)
+## Crypto core integration
 
 `src/keys.py` and `src/signing.py` define the stable integration surface for the crypto implementation. Replace their `CryptoNotReadyError` stubs with implementations that preserve these call signatures:
 
@@ -33,5 +33,3 @@ The three profile names are `rsa-pss-sha256`, `ecdsa-p256-sha256`, and `ed25519`
 Manifests use canonical UTF-8 JSON (ASCII field values, fixed field order, no BOM, whitespace, newline, duplicate/extra fields, or `\\uXXXX` escape) and are limited to 16 KiB. Bundles are limited to 64 KiB and Base64 values must decode and re-encode identically. Trust-store mutations write a same-directory temporary file and replace the old file atomically.
 
 Verification returns the first failing status from the required order: input/I/O, format, supported algorithm, trusted key and package permission, signature, expected metadata/name, artifact size and SHA-256, then `OK`. `verify --json` emits one JSON result object and uses exit codes 0 (valid), 1 (rejected), or 2 (input/I/O/environment error).
-
-The crypto files are intentionally stubs until work item 1 is completed; key generation, signing, trust-key validation, and signature verification will report that the crypto core is unavailable in the meantime.

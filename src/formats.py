@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 class FormatError(ValueError):
-    """Input bytes do not satisfy the on-disk format contract."""
+    pass
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}

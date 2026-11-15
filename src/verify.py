@@ -52,7 +52,7 @@ def verify_bytes(
     expected_version: str,
     artifact_name: str,
 ) -> VerifyResult:
-    """Verify in contract order. I/O and argument checks belong to the CLI (step 1)."""
+    # Memverifikasi mengikuti urutan kontrak.
     manifest: dict[str, Any] | None = None
     try:
         manifest_bytes, signature = parse_bundle(bundle_bytes)
@@ -99,7 +99,7 @@ def read_verify_inputs(
     expected_package: str,
     expected_version: str,
 ) -> VerifyResult:
-    """Read all required inputs before parsing; any read failure is INPUT_ERROR."""
+    # Membaca semua masukan sebelum parsing.
     try:
         with open(artifact_path, "rb") as stream:
             artifact = stream.read()

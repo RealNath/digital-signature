@@ -6,7 +6,7 @@ from typing import Any, Callable
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 
-# Profil dari Tabel 2.1
+# Profil Algoritma untuk kunci publik dan privat.
 RSA_PSS = "rsa-pss-sha256"
 ECDSA_P256 = "ecdsa-p256-sha256"
 ED25519 = "ed25519"
@@ -33,7 +33,7 @@ _GENERATORS: dict[str, Callable[[], Any]] = {
 }
 
 def generate_keypair(algorithm: str) -> tuple[bytes, bytes, str]:
-    """Return PKCS8 private PEM, SPKI public PEM, and lowercase SPKI fingerprint."""
+    # Mengembalikan PEM privat PKCS8, PEM publik SPKI, dan sidik jari SPKI huruf kecil.
 
     generator = _GENERATORS.get(algorithm)
     if generator is None:
@@ -55,20 +55,17 @@ def generate_keypair(algorithm: str) -> tuple[bytes, bytes, str]:
     return private_pem, public_pem, fingerprint(public_key)
 
 def load_private_key(pem: bytes) -> Any:
-    """Load an unencrypted PKCS8 PEM private key."""
+    # Memuat kunci privat PEM PKCS8 tanpa enkripsi.
 
     return serialization.load_pem_private_key(pem, password=None)
 
 def load_public_key(pem: bytes) -> Any:
-    """Load an SPKI PEM public key."""
+    # Memuat kunci publik PEM SPKI.
 
     return serialization.load_pem_public_key(pem)
 
 def get_algorithm(key: Any) -> str:
-    """Return the Table 2.1 profile name for a loaded key.
-
-    Raises ValueError when the key type or its parameters do not match a profile.
-    """
+    # Mengembalikan nama profil algoritma untuk kunci publik atau privat.
 
     if isinstance(key, (rsa.RSAPrivateKey, rsa.RSAPublicKey)):
         if isinstance(key, rsa.RSAPrivateKey):
@@ -90,12 +87,12 @@ def get_algorithm(key: Any) -> str:
     raise ValueError(f"unsupported key type: {type(key).__name__}")
 
 def public_key_from_private(private_key: Any) -> Any:
-    """Derive the public key corresponding to a loaded private key."""
+    # Mengambil kunci publik yang berpasangan dengan kunci privat.
 
     return private_key.public_key()
 
 def fingerprint(public_key: Any) -> str:
-    """Return hex_lower(SHA256(DER SPKI)) for a loaded public key."""
+    # Menerapkan hex_lower(SHA256(DER SPKI)) untuk kunci publik.
 
     public_der = public_key.public_bytes(
         encoding=serialization.Encoding.DER,
