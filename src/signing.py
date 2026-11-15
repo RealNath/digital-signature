@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 RSA_SALT_LENGTH = 32
 ECDSA_SCALAR_BYTES = 32
 
-# Fixed signature sizes from Table 2.1.
+# Ukuran signature, dari tabel 2.1
 SIGNATURE_SIZES = {
     RSA_PSS: 384,
     ECDSA_P256: 64,
@@ -26,7 +26,7 @@ SIGNATURE_SIZES = {
 }
 
 def sign(private_key: Any, message: bytes) -> bytes:
-    """Sign the exact message bytes; implementations must not pre-hash twice."""
+    """Sign the exact message bytes."""
 
     algorithm = get_algorithm(private_key)
 
@@ -51,7 +51,7 @@ def sign(private_key: Any, message: bytes) -> bytes:
     raise ValueError(f"unsupported algorithm: {algorithm}")
 
 def verify(public_key: Any, message: bytes, signature: bytes) -> bool:
-    """Verify the exact message bytes and return False for an invalid signature."""
+    """Verify the exact message bytes (return False for invalid signature)."""
 
     algorithm = get_algorithm(public_key)
     if len(signature) != SIGNATURE_SIZES[algorithm]:

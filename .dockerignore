@@ -1,0 +1,25 @@
+.git
+.gitignore
+.github
+
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+.venv
+venv
+
+**/*.pem
+keys/
+secrets/
+
+# Not needed to run the tool
+tests/
+benchmark/
+docs/
+*.pdf
+*.md
+LICENSE
+Dockerfile
+.dockerignore
