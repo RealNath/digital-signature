@@ -1,2 +1,1 @@
-cryptography
-pytest
+cryptography==50.0.2
