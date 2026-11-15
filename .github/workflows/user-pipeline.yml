@@ -1,0 +1,63 @@
+name: release-pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/realnath/digital-signature@sha256:ae42a3d84e29a7961c4e0a97f4318f158be9070b3ddb731af94db43adf9b424f
+  PACKAGE: demo-app
+  VERSION: 1.0.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      KEY_FILE: ${{ runner.temp }}/signing.key.pem
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write signing key
+        env:
+          SIGNING_KEY_PEM: ${{ secrets.SIGNING_KEY_PEM }}
+        run: |
+          if [ -z "${SIGNING_KEY_PEM:-}" ]; then
+            echo "SIGNING_KEY_PEM secret is not set" >&2
+            exit 1
+          fi
+          install -m 600 /dev/null "$KEY_FILE"
+          printf '%s\n' "$SIGNING_KEY_PEM" > "$KEY_FILE"
+
+      - name: C01 Ambil image rilis dari registry, lalu jalankan sign dan verify terhadap artefak sah
+        run: bash tests/ci/c01.sh
+
+      # C02 - C05 seharusnya memiliki hasil tidak valid
+      - name: C02 Ubah satu byte artefak setelah sign
+        run: bash tests/ci/c02.sh
+
+      - name: C03 Verifikasi artefak menggunakan trust store kosong atau kunci yang tidak diizinkan
+        run: bash tests/ci/c03.sh
+
+      - name: C04 path artefak yang berkasnya tidak tersedia
+        run: bash tests/ci/c04.sh
+
+      - name: C05 UID/GID runner, tanpa TTY, dan menggunakan --network none
+        run: bash tests/ci/c05.sh
+
+      - name: Discard signing key
+        if: always()
+        run: rm -f "$KEY_FILE"
+
+      - name: Keep evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: |
+            out/
+            dist/
+          if-no-files-found: ignore
