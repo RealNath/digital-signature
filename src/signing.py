@@ -26,7 +26,9 @@ SIGNATURE_SIZES = {
 }
 
 def sign(private_key: Any, message: bytes) -> bytes:
-    # Mendandatangani pesan dalam bentuk bytes.
+    # Menandatangani pesan dalam bentuk bytes.
+    if not isinstance(message, bytes):
+        raise TypeError("message must be bytes")
 
     algorithm = get_algorithm(private_key)
 
@@ -52,6 +54,8 @@ def sign(private_key: Any, message: bytes) -> bytes:
 
 def verify(public_key: Any, message: bytes, signature: bytes) -> bool:
     # Memverifikasi signature untuk pesan dalam bentuk bytes.
+    if not isinstance(message, bytes) or not isinstance(signature, bytes):
+        raise TypeError("message and signature must be bytes")
 
     algorithm = get_algorithm(public_key)
     if len(signature) != SIGNATURE_SIZES[algorithm]:

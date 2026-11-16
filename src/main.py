@@ -24,15 +24,21 @@ except ImportError:
     from manifest import ALGORITHMS, PACKAGE_RE, VERSION_RE, build_manifest
     from verify import VerifyResult, read_verify_inputs
 
-__version__ = "v0.0.1"
+__version__ = "0.0.1"
 EXIT_OK = 0
 EXIT_REJECTED = 1
 EXIT_ERROR = 2
 
+class CliParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self._error_message = message
+        super().error(message)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="minisign", description="Sign and verify software releases.")
+    parser = CliParser(prog="minisign", description="Sign and verify software releases.")
     parser.add_argument("--version", action="version", version=__version__)
-    commands = parser.add_subparsers(dest="command", metavar="<command>")
+    commands = parser.add_subparsers(dest="command", metavar="<command>", parser_class=CliParser)
     commands.required = True
 
     p = commands.add_parser("keygen", help="Generate a key pair")
@@ -47,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", required=True, metavar="<release-version>")
     p.add_argument("--key", required=True, metavar="<private.pem>")
     p.add_argument("--out", required=True, metavar="<bundle.json>")
+    p.add_argument("--force", action="store_true", help="Allow replacing an existing output bundle file")
     p.set_defaults(handler=cmd_sign)
 
     p = commands.add_parser("verify", help="Verify an artifact against a bundle")
@@ -120,15 +127,40 @@ def cmd_keygen(args: argparse.Namespace) -> int:
         print(f"minisign: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
-def _write_new(path: str, data: bytes) -> None:
+def _write_new(path: str, data: bytes, force: bool = False) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    with open(target, "xb") as stream:
-        stream.write(data)
+    if not force:
+        with open(target, "xb") as stream:
+            stream.write(data)
+        return
+    fd = -1
+    temporary: str | None = None
+    try:
+        fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent))
+        with os.fdopen(fd, "wb") as stream:
+            fd = -1
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+        temporary = None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+
 
 def cmd_sign(args: argparse.Namespace) -> int:
     try:
         _validate_release_inputs(args.package, args.version)
+        force = getattr(args, "force", False)
+        if not force and Path(args.out).exists():
+            raise FileExistsError("bundle output file already exists; pass --force to replace it")
         artifact_path = Path(args.file)
         artifact_bytes = artifact_path.read_bytes()
         private_pem = Path(args.key).read_bytes()
@@ -151,7 +183,7 @@ def cmd_sign(args: argparse.Namespace) -> int:
         )
         signature = signing.sign(private_key, manifest_bytes)
         bundle_bytes = build_bundle(manifest_bytes, signature)
-        _write_new(args.out, bundle_bytes)
+        _write_new(args.out, bundle_bytes, force=force)
         return EXIT_OK
     except Exception as exc:
         print(f"minisign: {exc}", file=sys.stderr)
@@ -203,8 +235,17 @@ def cmd_trust_remove(args: argparse.Namespace) -> int:
         return EXIT_ERROR
 
 def main(argv: list[str] | None = None) -> int:
+    effective_argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(effective_argv)
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else EXIT_ERROR
+        if code != EXIT_OK and len(effective_argv) >= 1 and effective_argv[0] == "verify" and "--json" in effective_argv:
+            result = VerifyResult(False, "INPUT_ERROR", "Missing or invalid CLI arguments for verify.")
+            print(json.dumps(result.as_dict(), separators=(",", ":"), ensure_ascii=True))
+            return EXIT_ERROR
+        raise
     return args.handler(args)
 
 if __name__ == "__main__":

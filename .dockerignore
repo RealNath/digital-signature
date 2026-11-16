@@ -18,6 +18,7 @@ secrets/
 tests/
 benchmark/
 docs/
+ci/
 *.pdf
 *.md
 LICENSE

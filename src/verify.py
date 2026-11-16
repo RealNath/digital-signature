@@ -56,8 +56,8 @@ def verify_bytes(
     manifest: dict[str, Any] | None = None
     try:
         manifest_bytes, signature = parse_bundle(bundle_bytes)
-        trust_store = parse_store(trust_bytes)
         manifest = parse_manifest(manifest_bytes)
+        trust_store = parse_store(trust_bytes)
     except FormatError as exc:
         return _result("FORMAT_ERROR", str(exc), manifest)
 
@@ -115,5 +115,5 @@ def read_verify_inputs(
         trust,
         expected_package,
         expected_version,
-        os.path.basename(os.fspath(artifact_path)),
+        os.path.basename(os.fspath(artifact_path).replace("\\", "/")),
     )

@@ -74,7 +74,7 @@ def save_store_atomic(path: str | os.PathLike[str], store: dict[str, Any]) -> No
     validated = validate_store(store)
     target = Path(path)
     parent = target.parent if str(target.parent) else Path(".")
-    parent.mkdir(parents=False, exist_ok=True)
+    parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(validated, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8") + b"\n"
     if len(payload) > MAX_TRUST_STORE_BYTES:
         raise FormatError("trust store exceeds the 1 MiB implementation limit")

@@ -3,6 +3,11 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Callable
 
+try:
+    from .formats import FormatError, strict_b64decode
+except ImportError:
+    from formats import FormatError, strict_b64decode
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 
@@ -32,6 +37,33 @@ _GENERATORS: dict[str, Callable[[], Any]] = {
     ED25519: _generate_ed25519,
 }
 
+def extract_pem_der(pem: bytes, label: str) -> bytes:
+    if not isinstance(pem, bytes):
+        raise TypeError("PEM data must be bytes")
+    if pem.startswith(b"\xef\xbb\xbf"):
+        raise ValueError(f"{label} PEM must not contain a UTF-8 BOM")
+    try:
+        text = pem.decode("ascii", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{label} PEM must contain ASCII characters only") from exc
+    normalized = text.replace("\r\n", "\n")
+    if "\r" in normalized:
+        raise ValueError(f"{label} PEM contains invalid carriage returns")
+    lines = normalized.strip().split("\n")
+    begin_marker = f"-----BEGIN {label}-----"
+    end_marker = f"-----END {label}-----"
+    if len(lines) < 3 or lines[0] != begin_marker or lines[-1] != end_marker:
+        raise ValueError(f"Expected PEM with label {label}")
+    body_lines = lines[1:-1]
+    if any(not line or line.startswith("-----") for line in body_lines):
+        raise ValueError(f"Invalid PEM body in {label}")
+    b64_body = "".join(body_lines)
+    try:
+        return strict_b64decode(b64_body, f"{label} PEM")
+    except FormatError as exc:
+        raise ValueError(str(exc)) from exc
+
+
 def generate_keypair(algorithm: str) -> tuple[bytes, bytes, str]:
     # Mengembalikan PEM privat PKCS8, PEM publik SPKI, dan sidik jari SPKI huruf kecil.
 
@@ -55,14 +87,26 @@ def generate_keypair(algorithm: str) -> tuple[bytes, bytes, str]:
     return private_pem, public_pem, fingerprint(public_key)
 
 def load_private_key(pem: bytes) -> Any:
-    # Memuat kunci privat PEM PKCS8 tanpa enkripsi.
+    # Memuat kunci privat PEM PKCS8 tanpa enkripsi dan memvalidasi parameter profil.
 
-    return serialization.load_pem_private_key(pem, password=None)
+    der = extract_pem_der(pem, "PRIVATE KEY")
+    private_key = serialization.load_der_private_key(der, password=None)
+    get_algorithm(private_key)
+    return private_key
 
 def load_public_key(pem: bytes) -> Any:
     # Memuat kunci publik PEM SPKI.
 
-    return serialization.load_pem_public_key(pem)
+    der = extract_pem_der(pem, "PUBLIC KEY")
+    public_key = serialization.load_der_public_key(der)
+    get_algorithm(public_key)
+    canonical_der = public_key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    if der != canonical_der:
+        raise ValueError("SPKI public key encoding does not match canonical profile format")
+    return public_key
 
 def get_algorithm(key: Any) -> str:
     # Mengembalikan nama profil algoritma untuk kunci publik atau privat.
