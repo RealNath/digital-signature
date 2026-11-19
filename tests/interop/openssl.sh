@@ -19,7 +19,7 @@ cd "$ROOT_DIR"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
-cli() {
+minisign() {
   python3 -m src.minisign "$@"
 }
 
@@ -29,7 +29,7 @@ extract_bundle() {
 }
 
 # OpenSSL verifikasi signature yang dibuat minisign
-openssl_verifies_ours() {
+openssl_verifies_minisign() {
   local profile=$1 dir=$2
   case "$profile" in
     rsa-pss-sha256)
@@ -72,25 +72,27 @@ openssl_signs() {
   esac
 }
 
-# Verifikasi, assert exit code-nya dan status yang dilaporkan.
+# Verifikasi, assert exit code-nya dan status, print status yang diamati.
 verify_expect() {
   local expected_exit=$1 expected_status=$2 dir=$3
   set +e
-  cli verify --file "$dir/artifact.bin" --bundle "$dir/openssl-bundle.json" \
+  minisign verify --file "$dir/artifact.bin" --bundle "$dir/openssl-bundle.json" \
     --trust-store "$dir/trust.json" --package "$PACKAGE" --version "$VERSION" \
     --json >"$dir/verify.json" 2>"$dir/verify.err"
   local actual=$?
   set -e
-  if [ "$actual" -ne "$expected_exit" ]; then
-    echo "expected exit $expected_exit, got $actual" >&2
+  local observed
+  observed=$(python3 - "$dir/verify.json" <<'PY' 2>/dev/null
+import json, sys
+print(json.load(open(sys.argv[1]))["status"])
+PY
+) || observed="<unparsable>"
+  if [ "$actual" -ne "$expected_exit" ] || [ "$observed" != "$expected_status" ]; then
+    echo "expected exit $expected_exit with status $expected_status, got exit $actual with status $observed" >&2
     cat "$dir/verify.json" "$dir/verify.err" >&2
     return 1
   fi
-  if ! grep -q "\"status\":\"$expected_status\"" "$dir/verify.json"; then
-    echo "expected status $expected_status, got:" >&2
-    cat "$dir/verify.json" >&2
-    return 1
-  fi
+  printf '%s\n' "$observed"
 }
 
 SUMMARY="$OUT_DIR/summary.txt"
@@ -101,10 +103,10 @@ for profile in rsa-pss-sha256 ecdsa-p256-sha256 ed25519; do
   mkdir -p "$dir"
   printf 'interop artifact for %s\n' "$profile" >"$dir/artifact.bin"
 
-  keyid=$(cli keygen --algorithm "$profile" --out "$dir/key")
-  cli sign --file "$dir/artifact.bin" --package "$PACKAGE" --version "$VERSION" \
+  keyid=$(minisign keygen --algorithm "$profile" --out "$dir/key")
+  minisign sign --file "$dir/artifact.bin" --package "$PACKAGE" --version "$VERSION" \
     --key "$dir/key.key.pem" --out "$dir/bundle.json" >/dev/null
-  cli trust add --key "$dir/key.pub.pem" --package "$PACKAGE" \
+  minisign trust add --key "$dir/key.pub.pem" --package "$PACKAGE" \
     --store "$dir/trust.json" >/dev/null
 
   extract_bundle "$dir"
@@ -118,14 +120,23 @@ for profile in rsa-pss-sha256 ecdsa-p256-sha256 ed25519; do
     exit 1
   fi
 
-  openssl_verifies_ours "$profile" "$dir" >/dev/null
-  echo "$profile: openssl verified our signature" >&2
+  if ! openssl_out=$(openssl_verifies_minisign "$profile" "$dir"); then
+    echo "$profile: openssl rejected minisign signature: $openssl_out" >&2
+    exit 1
+  fi
+
+  openssl_status=$(grep -oE "Verified OK|Signature Verified Successfully" <<<"$openssl_out" | head -1)
+  if [ -z "$openssl_status" ]; then
+    echo "$profile: openssl did not confirm minisign signature: $openssl_out" >&2
+    exit 1
+  fi
+  echo "$profile: openssl verified minisign signature ($openssl_status)" >&2
 
   openssl_signs "$profile" "$dir"
   python3 "$HELPERS" replace-signature "$dir/bundle.json" \
     "$dir/openssl-signature.bin" "$dir/openssl-bundle.json"
-  verify_expect 0 OK "$dir"
-  echo "$profile: our tool verified openssl's signature" >&2
+  minisign_status=$(verify_expect 0 OK "$dir")
+  echo "$profile: minisign verified openssl's signature (status=$minisign_status)" >&2
 
   # Coba flip 1 bit pada signature OpenSSL, cek penolakan
   python3 - "$dir/openssl-signature.bin" <<'PY'
@@ -137,12 +148,12 @@ open(path, "wb").write(bytes(data))
 PY
   python3 "$HELPERS" replace-signature "$dir/bundle.json" \
     "$dir/openssl-signature.bin" "$dir/openssl-bundle.json"
-  verify_expect 1 INVALID_SIGNATURE "$dir"
-  echo "$profile: tampered openssl signature rejected" >&2
+  tampered_status=$(verify_expect 1 INVALID_SIGNATURE "$dir")
+  echo "$profile: tampered openssl signature rejected (status=$tampered_status)" >&2
 
   size=$(wc -c <"$dir/signature.bin")
-  printf '%s keyid=%s signature_bytes=%s openssl_verifies_ours=ok ours_verifies_openssl=ok tampered=INVALID_SIGNATURE\n' \
-    "$profile" "$keyid" "$size" >>"$SUMMARY"
+  printf '%s keyid=%s signature_bytes=%s openssl_verifies_minisign="%s" minisign_verifies_openssl=%s tampered=%s\n' \
+    "$profile" "$keyid" "$size" "$openssl_status" "$minisign_status" "$tampered_status" >>"$SUMMARY"
 done
 
 echo
