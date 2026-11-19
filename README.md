@@ -31,7 +31,7 @@ Tidak ada library eksternal lain yang digunakan. Argument parsing, JSON, Base64,
 Image tersebut dipublikasikan ke GHCR dan menggunakan digest:
 
 ```bash
-docker run --rm ghcr.io/realnath/digital-signature@sha256:ae42a3d84e29a7961c4e0a97f4318f158be9070b3ddb731af94db43adf9b424f --help
+docker run --rm ghcr.io/realnath/digital-signature@sha256:ba04e9b9a6c54236edecdeb566395252d803c4083b289f375541fc8d99b2ab38 --help
 ```
 
 Tidak memerlukan jaringan, tidak memerlukan TTY, dan tidak memerlukan pengguna dengan hak akses khusus:
@@ -40,7 +40,7 @@ Tidak memerlukan jaringan, tidak memerlukan TTY, dan tidak memerlukan pengguna d
 docker run --rm --network none --user "$(id -u):$(id -g)" \
   -v "$PWD/dist:/input:ro" -v "$PWD/out:/output" \
   -v "$PWD/keys/publisher.key.pem:/run/signing.key.pem:ro" \
-  ghcr.io/realnath/digital-signature@sha256:ae42… sign \
+  ghcr.io/realnath/digital-signature@sha256:ba04… sign \
     --file /input/app.tar.gz --package demo-app --version 1.0.0 \
     --key /run/signing.key.pem --out /output/bundle.json
 ```

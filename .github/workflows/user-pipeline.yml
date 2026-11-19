@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  IMAGE: ghcr.io/realnath/digital-signature@sha256:ae42a3d84e29a7961c4e0a97f4318f158be9070b3ddb731af94db43adf9b424f
+  IMAGE: ghcr.io/realnath/digital-signature@sha256:ba04e9b9a6c54236edecdeb566395252d803c4083b289f375541fc8d99b2ab38
   PACKAGE: demo-app
   VERSION: 1.0.0
 
