@@ -1,22 +1,34 @@
 # MiniSign
 
-MiniSign adalah alat penandatanganan rilis yang ringan, dengan gaya serupa Cosign. Alat ini menandatangani *manifest* canonical JSON yang mendeskripsikan suatu artefak, mengemas *manifest* tersebut dan and tanda tangannya ke dalam sebuah *bundle* JSON, lalu memverifikasi *bundle* tersebut dengan mencocokkannya terhadap *trust store* yang menentukan kunci publik mana yang diizinkan untuk menandatangani paket tertentu.
+MiniSign adalah alat signing rilis yang ringan, dengan gaya serupa Cosign. Alat ini menandatangani *manifest* canonical JSON yang mendeskripsikan suatu artefak, mengemas *manifest* tersebut dan and tanda tangannya ke dalam sebuah *bundle* JSON, lalu memverifikasi *bundle* tersebut dengan mencocokkannya terhadap *trust store* yang menentukan kunci publik mana yang diizinkan untuk menandatangani paket tertentu.
 
-Semuanya merupakan satu CLI Python dengan tiga profil khusus yang dikemas sebagai citra kontainer yang dapat dijalankan secara luring dan tanpa hak akses istimewa (unprivileged).
+Minisign merupakan sebuah program CLI Python dengan tiga profil khusus dalam image container yang dapat dijalankan secara offline dan tanpa hak akses istimewa.
+
+## Tata Letak Repositori
+
+```text
+src/            CLI and crypto core (keys, signing, manifest, bundle, truststore, verify, formats)
+tests/unit/     U01-U14 scenario suite
+tests/ci/       C01-C05 integration scenarios against the published image
+tests/interop/  OpenSSL interoperability check
+benchmark/      bench.py plus generated results
+ci/             committed demo public key and trust store used by the pipeline
+.github/workflows/  image build/publish and release pipeline
+```
 
 ## Stack
 
 | Komponen | Versi |
 | --- | --- |
-| Python | 3.14 (`python:3.14-slim` in the image) |
-| `cryptography` | 50.0.2 (only runtime dependency) |
-| `pytest` | 9.2.0 (tests only, `requirements-dev.txt`) |
+| Python | 3.14 (`python:3.14-slim`) |
+| `cryptography` | 50.0.2 |
+| `pytest` | 9.2.0 (untuk testing, `requirements-dev.txt`) |
 
-Tidak ada paket pihak ketiga lain yang digunakan: argument parsing, JSON, Base64, dan hashing semuanya berasal dari pustaka standar.
+Tidak ada library eksternal lain yang digunakan. Argument parsing, JSON, Base64, dan hashing semuanya berasal dari pustaka standar.
 
-## Citra kontainer
+## Container image
 
-Citra tersebut dipublikasikan ke GHCR dan harus dirujuk menggunakan digest, bukan tag:
+Image tersebut dipublikasikan ke GHCR dan menggunakan digest:
 
 ```bash
 docker run --rm ghcr.io/realnath/digital-signature@sha256:ae42a3d84e29a7961c4e0a97f4318f158be9070b3ddb731af94db43adf9b424f --help
@@ -33,22 +45,22 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
     --key /run/signing.key.pem --out /output/bundle.json
 ```
 
-Kunci penandatanganan tidak pernah menjadi bagian dari citra, tapi dihadirkan sebagai *mount* yang bersifat *read-only*.
+Kunci signing tidak pernah menjadi bagian dari image, tapi dihadirkan sebagai *mount* yang bersifat *read-only*.
 
 ## CLI
 
-Dari direktori hasil *checkout*, jalankan `python3 -m src.minisign <command>` pada akar repositori. Di dalam *image*, *entrypoint* tetap sama, sehingga perintah `<image> <command>` dapat digunakan.
+Jalankan `python3 -m src.minisign <command>` pada root repository. Dalam *image*, *entrypoint* tetap sama, sehingga perintah `<image> <command>` dapat digunakan.
 
 ```text
-minisign keygen --algorithm <profile> --out <prefix> [--force]
-minisign sign --file <artifact> --package <name> --version <release> --key <private.pem> --out <bundle.json>
-minisign verify --file <artifact> --bundle <bundle.json> --trust-store <trust.json> --package <name> --version <release> [--json]
-minisign trust add --key <public.pem> --package <name> --store <trust.json>
-minisign trust list --store <trust.json>
-minisign trust remove --keyid <fingerprint> --store <trust.json>
+python3 -m src.minisign keygen --algorithm <profile> --out <prefix> [--force]
+python3 -m src.minisign sign --file <artifact> --package <name> --version <release> --key <private.pem> --out <bundle.json>
+python3 -m src.minisign verify --file <artifact> --bundle <bundle.json> --trust-store <trust.json> --package <name> --version <release> [--json]
+python3 -m src.minisign trust add --key <public.pem> --package <name> --store <trust.json>
+python3 -m src.minisign trust list --store <trust.json>
+python3 -m src.minisign trust remove --keyid <fingerprint> --store <trust.json>
 ```
 
-Satu kali eksekusi lokal secara menyeluruh:
+Contoh penggunaan:
 
 ```bash
 python3 -m src.minisign keygen --algorithm ed25519 --out keys/publisher
@@ -62,12 +74,11 @@ python3 -m src.minisign verify --file dist/demo-app.tar.gz \
   --package demo-app --version 1.0.0 --json
 ```
 
-`keygen` mencetak keyid. Perintah ini menulis `<prefix>.key.pem` (PKCS#8, unencrypted) dan `<prefix>.pub.pem` (SPKI), menolak untuk *overwrite* tanpa `--force`, dan
-`sign` menolak untuk *overwrite* bundel yang sudah ada.
+`keygen` mencetak keyid. Perintah ini menulis `<prefix>.key.pem` (PKCS#8, unencrypted) dan `<prefix>.pub.pem` (SPKI), menolak untuk *overwrite* tanpa `--force`, dan `sign` menolak untuk *overwrite* bundle yang sudah ada.
 
 ## Profil
 
-| Profil | Library primitive | Kunci publik | Tanda tangan |
+| Profil | Library primitive | Public key | Signature |
 | --- | --- | --- | --- |
 | `rsa-pss-sha256` | RSA-3072, e = 65537, PSS dengan MGF1-SHA256 dan 32-byte salt | ~625 B PEM | 384 B |
 | `ecdsa-p256-sha256` | ECDSA pada P-256 dengan SHA-256, tanda tangan disimpan dengan lebar tetap `r \|\| s` | ~178 B PEM | 64 B |
@@ -79,15 +90,15 @@ Keyid tersebut `hex(SHA256(DER SPKI))`, sehingga kunci publik yang sama akan sel
 
 ## Format file
 
-**Manifest** — canonical JSON, UTF-8, nilai ASCII, tanpa spasi, tanpa karakter baris baru di akhir, maksimal 16 KiB:
+**Manifest:** canonical JSON, UTF-8, nilai ASCII, tanpa spasi, tanpa karakter baris baru di akhir, maksimal 16 KiB:
 
 ```json
 {"schema":"minisign-manifest/v1","package":"demo-app","version":"1.0.0","algorithm":"ed25519","keyid":"576c…a473","artifact":{"name":"demo-app.tar.gz","size":139,"sha256":"9f2c…"}}
 ```
 
-Urutan kolom ditetapkan secara tetap, kolom tambahan maupun duplikat akan ditolak, dan sebuah verifikator akan menyusun ulang *manifest* tersebut dengan mengharuskan kesamaan byte supaya dua penyandian untuk objek yang sama tidak mungkin keduanya dapat diterima.
+Urutan kolomnya sudah fix, kolom tambahan maupun duplikat akan ditolak. Program akan menyusun ulang *manifest* tersebut dengan mengharuskan kesamaan byte agar 2 encoding untuk objek yang sama tidak dapat diterima sekaligus.
 
-**Bundle** — canonical JSON, paling banyak 64 KiB, kedua nilai dalam format Base64:
+**Bundle:** canonical JSON, paling banyak 64 KiB, kedua nilai dalam format Base64:
 
 ```json
 {"schema":"minisign-bundle/v1","manifest_b64":"eyJzY2hlbWEi…","signature_b64":"hL3k…"}
@@ -95,21 +106,21 @@ Urutan kolom ditetapkan secara tetap, kolom tambahan maupun duplikat akan ditola
 
 Tanda tangan tersebut mencakup byte *manifest* persis seperti yang tersimpan, bukan artefaknya.
 
-**Trust store** — kebijakan pihak pemanggil, satu entri untuk setiap kunci tepercaya:
+**Trust store:** kebijakan pihak pemanggil, satu entri untuk setiap kunci tepercaya:
 
 ```json
 {"schema":"minisign-trust/v1","keys":[{"keyid":"576c…a473","algorithm":"ed25519","public_key_pem":"-----BEGIN PUBLIC KEY-----\n…\n","packages":["demo-app"]}]}
 ```
 
-Sebuah kunci dapat dipercaya untuk beberapa paket; kunci yang dipercaya untuk `other-app` tidak dapat digunakan untuk memverifikasi rilis `demo-app`. Operasi perubahan mutasi menulis ulang berkas melalui berkas sementara di direktori yang sama menggunakan `os.replace`, sehingga jika terjadi *crash*, penyimpanan data tidak akan tertinggal dalam kondisi terpotong (*truncated*).
+Sebuah kunci dapat dipercaya untuk beberapa paket; kunci yang dipercaya untuk `other-app` tidak dapat digunakan untuk memverifikasi rilis `demo-app`. Mutation akan menulis ulang file di tempat sementara di folder yang sama menggunakan `os.replace`, sehingga jika terjadi *crash*, penyimpanan data tidak akan terpotong.
 
 ## Jenjang verifikasi
 
 `verify` berhenti pada langkah pertama yang gagal dan melaporkan status tersebut:
 
-| Urutan | Status | Makna | Keluar |
+| Urutan | Status | Makna | Exit Code |
 | --- | --- | --- | --- |
-| 1 | `INPUT_ERROR` | file masukan tidak dapat dibaca | 2 |
+| 1 | `INPUT_ERROR` | file input tidak bisa dibaca | 2 |
 | 2 | `FORMAT_ERROR` | *bundle*, *manifest*, atau *trust store* tidak tersusun dengan benar | 1 |
 | 3 | `UNSUPPORTED_ALGORITHM` | *manifest* menyebutkan profil yang tidak diimplementasikan oleh alat tersebut | 1 |
 | 4 | `KEY_NOT_TRUSTED` | keyid tidak diketahui, ketidakcocokan algoritma, atau paket tidak diizinkan | 1 |
@@ -118,9 +129,7 @@ Sebuah kunci dapat dipercaya untuk beberapa paket; kunci yang dipercaya untuk `o
 | 7 | `ARTIFACT_MISMATCH` | ukuran artefak atau SHA-256 berbeda dari *manifest*. | 1 |
 | 8 | `OK` | semua hal di atas tetap berlaku | 0 |
 
-Urutan berpengaruh: *manifest* yang telah diubah akan dilaporkan sebagai `INVALID_SIGNATURE`, bukan sebagai ketidakcocokan metadata, dan kunci yang tidak tepercaya akan ditolak bahkan sebelum tanda tangannya diperiksa.
-
-## Tes
+## Test
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
@@ -129,17 +138,17 @@ python3 -m pytest tests/unit -q      # U01-U14, 28 cases
 bash tests/interop/openssl.sh        # OpenSSL interop, both directions
 ```
 
-Skenario integrasi memerlukan citra yang telah dipublikasikan dan dijelaskan dalam `tests/README.md`; skenario tersebut menjalankan kontainer dengan opsi `--network none`, menggunakan UID/GID milik *runner*, dan menyertakan *digest* yang telah dipatok (*pinned digest*).
+Skenario integrasi memerlukan image yang telah dipublikasikan dan dijelaskan dalam `tests/README.md`; skenario tersebut menjalankan container dengan opsi `--network none`, menggunakan UID/GID milik *runner*, dan menyertakan *digest* yang telah dipatok (*pinned digest*).
 
 ## Benchmark
 
 ```bash
-python3 benchmark/bench.py           # 5 warmups, 30 measured runs
+python3 benchmark/bench.py           # 5 warmup, 30 percobaan
 ```
 
-Hasil ditulis ke dalam `benchmark/results.md` dan `benchmark/results.json`. Angka-angka utama dari pengujian referensi (Intel Core 5 210H, Python 3.14.9):
+Hasil ditulis di `benchmark/results.md` dan `benchmark/results.json`. Referensi pengujian (Intel Core 5 210H, Python 3.14.9):
 
-| Profil | sign 1 MiB | verify 1 MiB | CLI sign+verify | Tanda tangan | Bundle |
+| Profil | sign 1 MiB | verify 1 MiB | CLI sign+verify | Signature | Bundle |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `rsa-pss-sha256` | 1.72 ms | 0.55 ms | 187 ms | 384 B | 992 B |
 | `ecdsa-p256-sha256` | 0.49 ms | 0.57 ms | 114 ms | 64 B | 572 B |
@@ -147,20 +156,8 @@ Hasil ditulis ke dalam `benchmark/results.md` dan `benchmark/results.json`. Angk
 
 Di atas 1 MiB, proses SHA-256 terhadap artefak menjadi faktor yang paling dominan, sehingga ketiga profil tersebut bertemu di titik yang sama. Kolom CLI sebagian besar mencakup waktu inisialisasi interpreter serta pemuatan kunci RSA. Itulah sebabnya nilainya dua orde besaran lebih besar daripada proses kriptografinya sendiri.
 
-## Tata Letak Repositori
-
-```text
-src/            CLI and crypto core (keys, signing, manifest, bundle, truststore, verify, formats)
-tests/unit/     U01-U14 scenario suite
-tests/ci/       C01-C05 integration scenarios against the published image
-tests/interop/  OpenSSL interoperability check
-benchmark/      bench.py plus generated results
-ci/             committed demo public key and trust store used by the pipeline
-.github/workflows/  image build/publish and release pipeline
-```
-
 ## CI/CD
 
-`.github/workflows/build-image.yml` membangun dan mendorong *image* saat terdapat *tag* dengan pola `v*` atau melalui pemicuan manual, dan mencetak *digest* yang dihasilkan dalam ringkasan eksekusi (*run summary*).
+`.github/workflows/build-image.yml` membangun dan mendorong *image* saat terdapat *tag* baru dengan pola `v*` atau jika dimulai manual, dan mencetak *digest* yang dihasilkan dalam *run summary*.
 
-`.github/workflows/user-pipeline.yml` menarik citra tersebut **berdasarkan digest**-nya, menandatangani artefak demo menggunakan kunci dari *repository secrets*, memverifikasinya, lalu menjalankan skenario negatif. Setiap kali ada publikasi baru, *digest* dalam alur kerja (*workflow*) tersebut harus diperbarui; langkah manual inilah intinya: *pipeline* menjalankan citra yang telah ditinjau, bukan sekadar citra yang kebetulan dirujuk oleh suatu *tag*.
+`.github/workflows/user-pipeline.yml` menarik image tersebut **berdasarkan digest**-nya, menandatangani artefak demo menggunakan kunci dari *repository secrets*, memverifikasinya, lalu menjalankan skenario negatif. Setiap kali ada update/push, *digest* dalam *workflow* tersebut harus diperbarui.
